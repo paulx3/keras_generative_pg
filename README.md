@@ -27,6 +27,9 @@ implementing the model
 2. I didn't write a proper test function or use BLEU to 
 evaluate. This has to be done after I found out what's wrong 
 with my implementation.
+3. I only implemented two layer LSTM for both encoder and decoder
+which is different from the three-layer architecture mentioned
+in the thesis.
 
 # Progress
 - [x] Implement the basic framework of the thesis
