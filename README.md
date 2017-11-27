@@ -1,4 +1,4 @@
-# Paraphrase generation based on LSTM-VAE
+# Paraphrase generation based on LSTM-VAE by wanzeyu
 # Overview
 Keras implementation for 
 `A Deep Generative Framework for Paraphrase Generation`.
@@ -36,8 +36,8 @@ with my implementation.
 
 
 
-##### References
-    - [Toni-Antonova/VAE-Text-Generation](https://github.com/Toni-Antonova/VAE-Text-Generation)
-    - [A Deep Generative Framework for Paraphrase Generation](https://arxiv.org/pdf/1709.05074.pdf)
-    - [Building Autoencoders in Keras](https://blog.keras.io/building-autoencoders-in-keras.html)
-    - [Generating sentences from a continuous space](https://arxiv.org/abs/1511.06349)
+# References
+- [Toni-Antonova/VAE-Text-Generation](https://github.com/Toni-Antonova/VAE-Text-Generation)
+- [A Deep Generative Framework for Paraphrase Generation](https://arxiv.org/pdf/1709.05074.pdf)
+- [Building Autoencoders in Keras](https://blog.keras.io/building-autoencoders-in-keras.html)
+- [Generating sentences from a continuous space](https://arxiv.org/abs/1511.06349)
