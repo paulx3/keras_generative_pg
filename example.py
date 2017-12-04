@@ -4,8 +4,6 @@ from lstm_vae.helper import get_data, print_sentence_with_w2v, padding_len
 
 np.set_printoptions(threshold=np.nan)
 
-max_time_step = 100
-
 if __name__ == "__main__":
     original = get_data("test_source.txt")
     paraphrase = get_data("test_target.txt")
@@ -18,10 +16,10 @@ if __name__ == "__main__":
     vae, enc, gen = create_lstm_vae(input_dim,
                                     timesteps=time_steps,
                                     batch_size=batch_size,
-                                    intermediate_dim=20,
-                                    latent_dim=20,
+                                    intermediate_dim=800,
+                                    latent_dim=800,
                                     epsilon_std=1.,
-                                    max_time_step=max_time_step)
+                                    )
 
     # plot_model(enc, to_file="encoder.png")
     # plot_model(vae, to_file="vae.png")

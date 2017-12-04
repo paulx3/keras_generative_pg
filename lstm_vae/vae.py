@@ -1,9 +1,10 @@
 import keras
 from keras import backend as K
 from keras import objectives
-from keras.layers import Input, LSTM, RepeatVector
+from keras.layers import Input, LSTM, RepeatVector, Dropout
 from keras.layers.core import Dense, Lambda
 from keras.models import Model
+from keras.optimizers import SGD
 
 
 def create_lstm_vae(input_dim,
@@ -11,8 +12,7 @@ def create_lstm_vae(input_dim,
                     batch_size,
                     intermediate_dim,
                     latent_dim,
-                    epsilon_std=1.,
-                    max_time_step=100, ):
+                    epsilon_std=1., ):
     """
     Creates an LSTM Variational Autoencoder (VAE). Returns VAE, Encoder, Generator. 
 
@@ -29,32 +29,6 @@ def create_lstm_vae(input_dim,
         - [Building Autoencoders in Keras](https://blog.keras.io/building-autoencoders-in-keras.html)
         - [Generating sentences from a continuous space](https://arxiv.org/abs/1511.06349)
     """
-
-    def embedding_lstm(dimension, max_len):
-        def func(x):
-            if dimension == 0:
-                pass
-            if dimension == 1:
-                pass
-            if dimension == 2:
-                if x[2] is not None:
-                    print(x.shape)
-                    # if x[2].shape[0] != max_len:
-                    #     cur_len = x[2].shape[0]
-                    #     zeroes = max_len - cur_len
-            if dimension == 3:
-                pass
-            if dimension == 4:
-                pass
-
-        return Lambda(func)
-
-    def print_shape():
-        def func(x):
-            if x is not None:
-                print(x.shape)
-
-        return Lambda(func)
 
     def crop(dimension, start, end):
         # Crops (or slices) a Tensor on a given dimension from start to end
@@ -74,26 +48,40 @@ def create_lstm_vae(input_dim,
 
         return Lambda(func)
 
-    x = Input(shape=(timesteps, input_dim,), name="OriginalInput_1")
-
+    drop_out_layer = Dropout(rate=0.3)
     # original sentence encoding
-    paraphrase_sentence_input = Input(shape=(timesteps, input_dim,), name="ParaphraseInput_1")
-    layer_1 = LSTM(intermediate_dim, return_sequences=True)(paraphrase_sentence_input)
+    original_sentence_input = Input(shape=(timesteps, input_dim,), name="OriginalInput_1")
+    original_encoder_layer_1 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_1")
+    original_encoder_layer_2 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_2")
+    original_encoder_layer_3 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_3")
 
+    encoded_original = original_encoder_layer_1(original_sentence_input)
+    encoded_original = drop_out_layer(encoded_original)
+    encoded_original = original_encoder_layer_2(encoded_original)
+    encoded_original = drop_out_layer(encoded_original)
+    encoded_original = original_encoder_layer_3(encoded_original)
+
+    # paraphrase sentence encoder
+    paraphrase_sentence_encoder_layer1 = LSTM(intermediate_dim, return_sequences=True, name="ParaphraseEncoderLSTM_1")
+    paraphrase_sentence_encoder_layer2 = LSTM(intermediate_dim, return_sequences=True, name="ParaphraseEncoderLSTM_2")
+    paraphrase_sentence_encoder_layer3 = LSTM(intermediate_dim, name="ParaphraseEncoderLSTM_3")
+
+    x = Input(shape=(timesteps, input_dim,), name="ParaphraseInput_1")
     # LSTM encoding
     # h = LSTM(intermediate_dim)(x)
-    # h = embedding_lstm(dimension=2, max_len=max_time_step)(x)
-    # h = LSTM(max_time_step)(x)
     # merge original and paraphrase
-    # layer_1 = RepeatVector(timesteps)(layer_1)
-    h = keras.layers.concatenate([layer_1, x], axis=-1)
-    h = LSTM(intermediate_dim, return_sequences=True)(h)
-    # h = crop(2, 0, max_time_step)(h)
+    h = keras.layers.concatenate([encoded_original, x], axis=-1)
+    h = paraphrase_sentence_encoder_layer1(h)
+    h = drop_out_layer(h)
+    h = paraphrase_sentence_encoder_layer2(h)
+    h = drop_out_layer(h)
+    h = paraphrase_sentence_encoder_layer3(h)
+
     # VAE Z layer
     # h = Dense(intermediate_dim)(h)
     # h = LSTM(intermediate_dim, return_sequences=True)(h)
     # h = RepeatVector(timesteps)(h)
-    h = LSTM(intermediate_dim)(h)
+    # h = LSTM(intermediate_dim)(h)
     z_mean = Dense(latent_dim)(h)
     z_log_sigma = Dense(latent_dim)(h)
 
@@ -119,28 +107,42 @@ def create_lstm_vae(input_dim,
     x_decoded_mean = decoder_mean(h_decoded)
 
     # end-to-end autoencoder
-    vae = Model([x, paraphrase_sentence_input], x_decoded_mean)
+    vae = Model([original_sentence_input, x], x_decoded_mean)
 
     # encoder, from inputs to latent space
-    encoder = Model([x, paraphrase_sentence_input], z_mean)
+    encoder = Model([original_sentence_input, x], z_mean)
 
+    # paraphrase sentence decoder
+    paraphrase_sentence_decoder_layer1 = LSTM(intermediate_dim, return_sequences=True,
+                                              name="ParaphraseSentenceDecoder_1")
+    paraphrase_sentence_decoder_layer2 = LSTM(intermediate_dim, return_sequences=True,
+                                              name="ParaphraseSentenceDecoder_2")
+    paraphrase_sentence_decoder_layer3 = LSTM(intermediate_dim, return_sequences=True,
+                                              name="ParaphraseSentenceDecoder_3")
     # generator, from latent space to reconstructed inputs
-    decoder_input = Input(shape=(latent_dim,), name="DecoderLatentInput_1")
-    decoder_input_repeated = RepeatVector(timesteps)(decoder_input)
+    decoder_latent_input = Input(shape=(latent_dim,), name="DecoderLatentInput_1")
+    decoder_input_repeated = RepeatVector(timesteps)(decoder_latent_input)
     # decoder original encoder
     decoder_original_input = Input(shape=(timesteps, input_dim,), name="DecoderOriginalInput_1")
+    decoder_original_encoded = original_encoder_layer_1(decoder_original_input)
+    decoder_original_encoded = drop_out_layer(decoder_original_encoded)
+    decoder_original_encoded = original_encoder_layer_2(decoder_original_encoded)
+    decoder_original_encoded = drop_out_layer(decoder_original_encoded)
+    decoder_original_encoded = original_encoder_layer_3(decoder_original_encoded)
 
-    decoder_layer1 = LSTM(timesteps)(decoder_original_input)
+    paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer1(decoder_original_encoded)
+    paraphrase_sentence_decoded = keras.layers.concatenate([decoder_input_repeated, paraphrase_sentence_decoded],
+                                                           axis=-1)
+    paraphrase_sentence_decoded = drop_out_layer(paraphrase_sentence_decoded)
+    paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer2(paraphrase_sentence_decoded)
+    paraphrase_sentence_decoded = drop_out_layer(paraphrase_sentence_decoded)
+    paraphrase_sentence_decoded = keras.layers.concatenate([decoder_input_repeated, paraphrase_sentence_decoded],
+                                                           axis=-1)
+    paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer3(paraphrase_sentence_decoded)
 
-    _h_decoded = RepeatVector(timesteps)(decoder_layer1)
-    _h_decoded = decoder_h(_h_decoded)
+    _h_decoded = decoder_h(paraphrase_sentence_decoded)
     _x_decoded_mean = decoder_mean(_h_decoded)
-    output = keras.layers.concatenate([_x_decoded_mean, decoder_input_repeated], axis=-1)
-    output = Dense(timesteps)(output)
-    # output = crop(2, 0, 30)(output)
-    output = decoder_h(output)
-    output = decoder_mean(output)
-    generator = Model([decoder_input, decoder_original_input], output)
+    generator = Model([decoder_latent_input, decoder_original_input], _x_decoded_mean)
 
     def vae_loss(x, x_decoded_mean):
         xent_loss = objectives.mse(x, x_decoded_mean)
@@ -148,6 +150,8 @@ def create_lstm_vae(input_dim,
         loss = xent_loss + kl_loss
         return loss
 
-    vae.compile(optimizer='sgd', loss=vae_loss)
+    # sgd = SGD(lr=0.00005, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(lr=0.00005)
+    vae.compile(optimizer=sgd, loss=vae_loss)
 
     return vae, encoder, generator

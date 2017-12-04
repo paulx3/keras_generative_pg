@@ -12,7 +12,6 @@ import itertools
 from scipy import spatial
 from gensim.models import KeyedVectors
 
-
 np.set_printoptions(threshold=np.nan)
 END_TOKEN = np.array(300 * [1])
 UNK_TOKEN = np.array(300 * [2])
@@ -117,7 +116,7 @@ def get_data(file_name):
 # input: original dimension sentence vector
 # output: text
 def print_sentence_with_w2v(sent_vect):
-    for tocut in sent_vect:
+    for tocut in sent_vect[:10]:
         word_sent = ''
         for vec in tocut:
             word_sent += w2v.most_similar(positive=[vec], topn=1)[0][0]
