@@ -28,6 +28,18 @@ The default epoch is 200.
 If you want to change
 the parameters. You have to change according lines.
 
+# Model Architecture
+encoder model:
+
+![encoder](https://github.com/paulx3/keras_generative_pg/raw/master/encoder.png)
+
+decoder model:
+
+![decoder](https://github.com/paulx3/keras_generative_pg/raw/master/generator.png)
+
+vae overview:
+![overview](https://github.com/paulx3/keras_generative_pg/raw/master/generator.png)
+
 # Problems
 1. The result is really bad, I have to find what I did wrong in 
 implementing the model
