@@ -20,7 +20,8 @@ padding_len = 20
 
 # w2v = KeyedVectors.load_word2vec_format('D:\\Downloads\\wiki.en\\wiki.en.vec')
 # w2v = load_glove("D:\\Downloads\\glove.6B\\glove.6B.50d.txt")
-w2v = KeyedVectors.load_word2vec_format('D:\\Downloads\\wiki.simple\\wiki.simple.vec')
+# w2v = KeyedVectors.load_word2vec_format('D:\\Downloads\\wiki.simple\\wiki.simple.vec')
+w2v = KeyedVectors.load_word2vec_format('./wiki.simple.vec')
 
 
 # some matrix magic
