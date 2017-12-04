@@ -14,11 +14,18 @@ In this project I try to implement novel VAE-LSTM architecture mentioned in `A D
 Paraphrase Generation`.
 
 There are still many problems within. 
-If you have a better idea, please open an issue.
+If you have any problem, please open an issue.
 
 # QuickStart
-Use `python example.py`.By default ,the program will be in training mode and 
-will save model to three files. The default epoch is 20.If you want to change
+Use `python example.py`. The code will train on the corpus and 
+print predicted result after every epoch.
+
+By default ,the program will be in training mode and will save model 
+to three files. 
+
+The default epoch is 200.
+
+If you want to change
 the parameters. You have to change according lines.
 
 # Problems
@@ -27,19 +34,19 @@ implementing the model
 2. I didn't write a proper test function or use BLEU to 
 evaluate. This has to be done after I found out what's wrong 
 with my implementation.
-3. I only implemented two layer LSTM for both encoder and decoder
-which is different from the three-layer architecture mentioned
-in the thesis.
+
 
 # Progress
 - [x] Implement the basic framework of the thesis
-- [ ] Write the test code
-- [ ] Refactor and clean up the messy code
+- [ ] Write the evaluation code
+- [x] Refactor and clean up the messy code
+- [ ] Add comments
 
 
 
 
 # References
+- [Keras implementation of LSTM Variational Autoencoder](https://github.com/twairball/keras_lstm_vae)
 - [Toni-Antonova/VAE-Text-Generation](https://github.com/Toni-Antonova/VAE-Text-Generation)
 - [A Deep Generative Framework for Paraphrase Generation](https://arxiv.org/pdf/1709.05074.pdf)
 - [Building Autoencoders in Keras](https://blog.keras.io/building-autoencoders-in-keras.html)
