@@ -3,18 +3,18 @@
 Keras implementation for 
 `A Deep Generative Framework for Paraphrase Generation`.
 
-Warning:
+Resource Used:
 
-This project is still in its primitive stage. 
+1. MSRP paraphrase corpus
 
-I use part of MSRP data as the training data.
+2. Fasttext's pretrained vector
 
+Requirements:
+1. Keras
+2. Numpy
 
 In this project I try to implement novel VAE-LSTM architecture mentioned in `A Deep Generative Framework for 
 Paraphrase Generation`.
-
-There are still many problems within. 
-If you have any problem, please open an issue.
 
 # QuickStart
 Use `python example.py`. The code will train on the corpus and 
@@ -38,6 +38,7 @@ decoder model:
 ![decoder](https://github.com/paulx3/keras_generative_pg/raw/master/generator.png)
 
 vae overview:
+
 ![overview](https://github.com/paulx3/keras_generative_pg/raw/master/generator.png)
 
 # Problems
