@@ -1,7 +1,7 @@
 # Paraphrase generation based on LSTM-VAE by wanzeyu
 # Overview
 Keras implementation for 
-`A Deep Generative Framework for Paraphrase Generation`.
+[A Deep Generative Framework for Paraphrase Generation](https://arxiv.org/abs/1709.05074).
 
 Resource Used:
 
