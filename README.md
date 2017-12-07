@@ -45,7 +45,7 @@ decoder model:
 
 vae overview:
 
-![overview](https://github.com/paulx3/keras_generative_pg/raw/master/generator.png)
+![overview](https://github.com/paulx3/keras_generative_pg/raw/master/vae.png)
 
 # Problems
 1. I didn't write a proper test function or use BLEU to 
