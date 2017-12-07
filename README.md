@@ -28,6 +28,12 @@ The default epoch is 200.
 If you want to change
 the parameters. You have to change according lines.
 
+# Resource
+* `test_source.txt` is the original file
+* `test_target.txt` is the paraphrase file
+* `wiki.simple.vec` is fasttext's pretrained vector on simple 
+wiki
+
 # Model Architecture
 encoder model:
 
@@ -42,9 +48,7 @@ vae overview:
 ![overview](https://github.com/paulx3/keras_generative_pg/raw/master/generator.png)
 
 # Problems
-1. The result is really bad, I have to find what I did wrong in 
-implementing the model
-2. I didn't write a proper test function or use BLEU to 
+1. I didn't write a proper test function or use BLEU to 
 evaluate. This has to be done after I found out what's wrong 
 with my implementation.
 
@@ -53,7 +57,6 @@ with my implementation.
 - [x] Implement the basic framework of the thesis
 - [ ] Write the evaluation code
 - [x] Refactor and clean up the messy code
-- [ ] Add comments
 
 
 

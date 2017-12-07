@@ -1,10 +1,10 @@
 import keras
 from keras import backend as K
 from keras import objectives
-from keras.layers import Input, LSTM, RepeatVector, Dropout
+from keras.layers import Input, RepeatVector, LSTM
 from keras.layers.core import Dense, Lambda
 from keras.models import Model
-from keras.optimizers import SGD
+from keras.optimizers import RMSprop
 
 
 def create_lstm_vae(input_dim,
@@ -48,7 +48,7 @@ def create_lstm_vae(input_dim,
 
         return Lambda(func)
 
-    drop_out_layer = Dropout(rate=0.3)
+    # drop_out_layer = Dropout(rate=0.0)
     # original sentence encoding
     original_sentence_input = Input(shape=(timesteps, input_dim,), name="OriginalInput_1")
     original_encoder_layer_1 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_1")
@@ -56,15 +56,15 @@ def create_lstm_vae(input_dim,
     original_encoder_layer_3 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_3")
 
     encoded_original = original_encoder_layer_1(original_sentence_input)
-    encoded_original = drop_out_layer(encoded_original)
+    # encoded_original = drop_out_layer(encoded_original)
     encoded_original = original_encoder_layer_2(encoded_original)
-    encoded_original = drop_out_layer(encoded_original)
+    # encoded_original = drop_out_layer(encoded_original)
     encoded_original = original_encoder_layer_3(encoded_original)
 
     # paraphrase sentence encoder
     paraphrase_sentence_encoder_layer1 = LSTM(intermediate_dim, return_sequences=True, name="ParaphraseEncoderLSTM_1")
     paraphrase_sentence_encoder_layer2 = LSTM(intermediate_dim, return_sequences=True, name="ParaphraseEncoderLSTM_2")
-    paraphrase_sentence_encoder_layer3 = LSTM(intermediate_dim, name="ParaphraseEncoderLSTM_3")
+    paraphrase_sentence_encoder_layer3 = LSTM(intermediate_dim, return_sequences=True, name="ParaphraseEncoderLSTM_3")
 
     x = Input(shape=(timesteps, input_dim,), name="ParaphraseInput_1")
     # LSTM encoding
@@ -72,9 +72,9 @@ def create_lstm_vae(input_dim,
     # merge original and paraphrase
     h = keras.layers.concatenate([encoded_original, x], axis=-1)
     h = paraphrase_sentence_encoder_layer1(h)
-    h = drop_out_layer(h)
+    # h = drop_out_layer(h)
     h = paraphrase_sentence_encoder_layer2(h)
-    h = drop_out_layer(h)
+    # h = drop_out_layer(h)
     h = paraphrase_sentence_encoder_layer3(h)
 
     # VAE Z layer
@@ -82,26 +82,51 @@ def create_lstm_vae(input_dim,
     # h = LSTM(intermediate_dim, return_sequences=True)(h)
     # h = RepeatVector(timesteps)(h)
     # h = LSTM(intermediate_dim)(h)
-    z_mean = Dense(latent_dim)(h)
-    z_log_sigma = Dense(latent_dim)(h)
+
+    # test begin
+    # z_mean = Dense(latent_dim)(h)
+    # z_log_sigma = Dense(latent_dim)(h)
+    # test ends
+    z_mean = LSTM(latent_dim)(h)
+    z_log_sigma = LSTM(latent_dim)(h)
 
     def sampling(args):
         z_mean, z_log_sigma = args
         epsilon = K.random_normal(shape=(batch_size, latent_dim),
                                   mean=0., stddev=epsilon_std)
-        # return z_mean + K.exp(z_log_sigma) * epsilon_std
-        return z_mean + z_log_sigma * epsilon
+        # return z_mean + z_log_sigma * epsilon
+        return z_mean + K.exp(z_log_sigma) * epsilon
+        # return z_mean + K.exp(z_log_sigma / 2) * epsilon
 
     # note that "output_shape" isn't necessary with the TensorFlow backend
     # so you could write `Lambda(sampling)([z_mean, z_log_sigma])`
     z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_sigma])
 
     # decoded LSTM layer
-    decoder_h = LSTM(timesteps, return_sequences=True, name="DecoderH_1")
-    decoder_mean = LSTM(input_dim, return_sequences=True, name="DecoderMean_1")
+    # decoder_h = LSTM(timesteps, return_sequences=True, name="DecoderH_1")
+    # decoder_mean = LSTM(input_dim, return_sequences=True, name="DecoderMean_1")
+    decoder_h = Dense(intermediate_dim, name="DecoderH_1", activation="relu")
+    decoder_mean = Dense(input_dim, name="DecoderMean_1", activation="sigmoid")
+
+    # paraphrase sentence decoder
+    paraphrase_sentence_decoder_layer1 = LSTM(intermediate_dim, return_sequences=True,
+                                              name="ParaphraseSentenceDecoder_1")
+    paraphrase_sentence_decoder_layer2 = LSTM(intermediate_dim, return_sequences=True,
+                                              name="ParaphraseSentenceDecoder_2")
+    paraphrase_sentence_decoder_layer3 = LSTM(intermediate_dim, return_sequences=True,
+                                              name="ParaphraseSentenceDecoder_3")
 
     h_decoded = RepeatVector(timesteps)(z)
-    h_decoded = decoder_h(h_decoded)
+
+    paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer1(encoded_original)
+    paraphrase_sentence_decoded = keras.layers.concatenate([h_decoded, paraphrase_sentence_decoded],
+                                                           axis=-1)
+    paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer2(paraphrase_sentence_decoded)
+    paraphrase_sentence_decoded = keras.layers.concatenate([h_decoded, paraphrase_sentence_decoded],
+                                                           axis=-1)
+    paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer3(paraphrase_sentence_decoded)
+
+    h_decoded = decoder_h(paraphrase_sentence_decoded)
 
     # decoded layer
     x_decoded_mean = decoder_mean(h_decoded)
@@ -112,46 +137,55 @@ def create_lstm_vae(input_dim,
     # encoder, from inputs to latent space
     encoder = Model([original_sentence_input, x], z_mean)
 
-    # paraphrase sentence decoder
-    paraphrase_sentence_decoder_layer1 = LSTM(intermediate_dim, return_sequences=True,
-                                              name="ParaphraseSentenceDecoder_1")
-    paraphrase_sentence_decoder_layer2 = LSTM(intermediate_dim, return_sequences=True,
-                                              name="ParaphraseSentenceDecoder_2")
-    paraphrase_sentence_decoder_layer3 = LSTM(intermediate_dim, return_sequences=True,
-                                              name="ParaphraseSentenceDecoder_3")
     # generator, from latent space to reconstructed inputs
     decoder_latent_input = Input(shape=(latent_dim,), name="DecoderLatentInput_1")
     decoder_input_repeated = RepeatVector(timesteps)(decoder_latent_input)
     # decoder original encoder
     decoder_original_input = Input(shape=(timesteps, input_dim,), name="DecoderOriginalInput_1")
     decoder_original_encoded = original_encoder_layer_1(decoder_original_input)
-    decoder_original_encoded = drop_out_layer(decoder_original_encoded)
+    # decoder_original_encoded = drop_out_layer(decoder_original_encoded)
     decoder_original_encoded = original_encoder_layer_2(decoder_original_encoded)
-    decoder_original_encoded = drop_out_layer(decoder_original_encoded)
+    # decoder_original_encoded = drop_out_layer(decoder_original_encoded)
     decoder_original_encoded = original_encoder_layer_3(decoder_original_encoded)
 
     paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer1(decoder_original_encoded)
     paraphrase_sentence_decoded = keras.layers.concatenate([decoder_input_repeated, paraphrase_sentence_decoded],
                                                            axis=-1)
-    paraphrase_sentence_decoded = drop_out_layer(paraphrase_sentence_decoded)
+    # paraphrase_sentence_decoded = drop_out_layer(paraphrase_sentence_decoded)
     paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer2(paraphrase_sentence_decoded)
-    paraphrase_sentence_decoded = drop_out_layer(paraphrase_sentence_decoded)
     paraphrase_sentence_decoded = keras.layers.concatenate([decoder_input_repeated, paraphrase_sentence_decoded],
                                                            axis=-1)
+    # paraphrase_sentence_decoded = drop_out_layer(paraphrase_sentence_decoded)
     paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer3(paraphrase_sentence_decoded)
 
     _h_decoded = decoder_h(paraphrase_sentence_decoded)
     _x_decoded_mean = decoder_mean(_h_decoded)
     generator = Model([decoder_latent_input, decoder_original_input], _x_decoded_mean)
 
+    # def vae_loss(x, x_decoded_mean):
+    #     xent_loss = objectives.mse(x, x_decoded_mean)
+    #     kl_loss = - 0.5 * K.mean(1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma))
+    #     loss = xent_loss + kl_loss
+    #     return loss
     def vae_loss(x, x_decoded_mean):
-        xent_loss = objectives.mse(x, x_decoded_mean)
-        kl_loss = - 0.5 * K.mean(1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma))
-        loss = xent_loss + kl_loss
-        return loss
+        xent_loss = objectives.binary_crossentropy(x, x_decoded_mean)
+        kl_loss = - 0.5 * K.mean(1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma), axis=-1)
+        return xent_loss + kl_loss
+
+    # def vae_loss(x, x_decoded_mean):
+    #     xent_loss = input_dim * metrics.binary_crossentropy(x, x_decoded_mean)
+    #     kl_loss = - 0.5 * K.sum(1 + z_log_sigma - K.square(z_mean) - K.exp(z_log_sigma), axis=-1)
+    #     return K.mean(xent_loss + kl_loss)
+    # def vae_loss(x, x_decoded_mean):
+    #     # E[log P(X|z)]
+    #     recon = K.sum(K.binary_crossentropy(x, x_decoded_mean), axis=1)
+    #     # D_KL(Q(z|X) || P(z|X)); calculate in closed form as both dist. are Gaussian
+    #     kl = 0.5 * K.sum(K.exp(z_log_sigma) + K.square(z_mean) - 1. - z_log_sigma, axis=1)
+    #     return recon + kl
 
     # sgd = SGD(lr=0.00005, decay=1e-6, momentum=0.9, nesterov=True)
-    sgd = SGD(lr=0.00005)
-    vae.compile(optimizer=sgd, loss=vae_loss)
+    # sgd = SGD(lr=0.00005)
+    rmsprop = RMSprop()
+    vae.compile(optimizer=rmsprop, loss=vae_loss)
 
     return vae, encoder, generator

@@ -7,9 +7,9 @@
 
 @time: 2017/12/4 2:19
 '''
-import numpy as np
 import itertools
-from scipy import spatial
+
+import numpy as np
 from gensim.models import KeyedVectors
 
 np.set_printoptions(threshold=np.nan)
@@ -18,9 +18,6 @@ UNK_TOKEN = np.array(300 * [2])
 ZERO_TOKEN = np.array(300 * [0])
 padding_len = 20
 
-# w2v = KeyedVectors.load_word2vec_format('D:\\Downloads\\wiki.en\\wiki.en.vec')
-# w2v = load_glove("D:\\Downloads\\glove.6B\\glove.6B.50d.txt")
-# w2v = KeyedVectors.load_word2vec_format('D:\\Downloads\\wiki.simple\\wiki.simple.vec')
 w2v = KeyedVectors.load_word2vec_format('./wiki.simple.vec')
 
 
@@ -35,19 +32,6 @@ def sent_parse(sentence, mat_shape):
     return zero_matr
 
 
-# input: encoded sentence vector
-# output: encoded sentence vector in dataset with highest cosine similarity
-def find_similar_encoding(sent_vect):
-    all_cosine = []
-    for sent in sent_encoded:
-        result = 1 - spatial.distance.cosine(sent_vect, sent)
-        all_cosine.append(result)
-    data_array = np.array(all_cosine)
-    maximum = data_array.argsort()[-3:][::-1][1]
-    new_vec = sent_encoded[maximum]
-    return new_vec
-
-
 # input: two points, integer n
 # output: n equidistant points on the line between the input points (inclusive)
 def shortest_homology(point_one, point_two, num):
@@ -57,21 +41,6 @@ def shortest_homology(point_one, point_two, num):
     for s in sample:
         hom_sample.append(point_one + s * dist_vec)
     return hom_sample
-
-
-# input: two written sentences, VAE batch-size, dimension of VAE input
-# output: the function embeds the sentences in latent-space, and then prints their generated text representations
-# along with the text representations of several points in between them
-def sent_2_sent(sent1, sent2, batch, dim):
-    a = sent_parse([sent1], (batch, dim))
-    b = sent_parse([sent2], (batch, dim))
-    encode_a = enc.predict(a, batch_size=batch)
-    encode_b = enc.predict(b, batch_size=batch)
-    test_hom = shortest_homology(encode_a[0], encode_b[0], 5)
-
-    for point in test_hom:
-        p = gen.predict(np.array([point]))[0]
-        print_sentence_with_w2v(p)
 
 
 def load_glove(glove_file):
