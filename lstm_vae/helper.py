@@ -9,27 +9,106 @@
 '''
 import itertools
 
+import nltk
 import numpy as np
-from gensim.models import KeyedVectors
+from keras.utils.np_utils import to_categorical
+from numpy import array
 
 np.set_printoptions(threshold=np.nan)
-END_TOKEN = np.array(300 * [1])
-UNK_TOKEN = np.array(300 * [2])
-ZERO_TOKEN = np.array(300 * [0])
-padding_len = 20
+padding_len = 29
 
-w2v = KeyedVectors.load_word2vec_format('./wiki.simple.vec')
+UNK_TOKEN = 2
+END_TOKEN = 1
+
+# line read limit in case of "Memory Error"
+limit = 100
 
 
-# some matrix magic
-def sent_parse(sentence, mat_shape):
-    data_concat = []
-    word_vecs = vectorize_sentences(sentence)
-    for x in word_vecs:
-        data_concat.append(list(itertools.chain.from_iterable(x)))
-    zero_matr = np.zeros(mat_shape)
-    zero_matr[0] = np.array(data_concat)
-    return zero_matr
+def get_vocab():
+    print("generate vocab")
+    words = []
+    count_1 = 0
+    count_2 = 0
+    with open("test_source.txt", "r", encoding="utf8") as fp:
+        for line in fp:
+            if count_1 == limit:
+                break
+            count_1 += 1
+            res = line.strip().split(" ")
+            for i in res:
+                words.append(i)
+    with open("test_target.txt", "r", encoding="utf8") as fp:
+        for line in fp:
+            if count_2 == limit:
+                break
+            count_2 += 1
+            res = line.strip().split(" ")
+            for i in res:
+                words.append(i)
+    freq = nltk.FreqDist(words)
+    with open("train_vocab.txt", "w", encoding="utf8") as fp:
+        fp.write("</S>")
+        fp.write("\n")
+        fp.write("_")
+        fp.write("\n")
+        fp.write("<UNK>")
+        fp.write("\n")
+        for word in freq.most_common():
+            fp.write(word[0])
+            fp.write("\n")
+
+
+def load_vocab(filename):
+    vocab = {}
+    with open(filename) as f:
+        for idx, line in enumerate(f):
+            vocab[line.strip()] = idx
+    return vocab
+
+
+# generate vocab
+get_vocab()
+vocab = load_vocab("train_vocab.txt")
+id_vocab = {value: key for key, value in vocab.items()}
+num_decoder_tokens = len(vocab)
+
+
+def tokenize_and_map(line):
+    return [vocab["_"]] + [vocab.get(token, UNK_TOKEN) for token in line.split(' ')]
+
+
+def get_data_v2(file_name):
+    res = []
+    count = 0
+    with open(file_name) as fp:
+        for in_line in fp:
+            if count == limit:
+                break
+            count += 1
+            tmp = tokenize_and_map(in_line)[:(padding_len - 1)] + [END_TOKEN]
+            res.append(tmp)
+    return res
+
+
+def get_data_v2_offset(file_name):
+    res = []
+    count = 0
+    with open(file_name) as fp:
+        for in_line in fp:
+            if count == limit:
+                break
+            count += 1
+            tmp = tokenize_and_map(in_line)[:(padding_len - 1)] + [END_TOKEN]
+            tmp = tmp[1:]
+            res.append(tmp)
+    return res
+
+
+def manual_one_hot(lines):
+    res = []
+    for line in lines:
+        res.append(to_categorical(line, num_classes=num_decoder_tokens))
+    return array(res)
 
 
 # input: two points, integer n
@@ -54,45 +133,3 @@ def load_glove(glove_file):
         model[word] = embedding
     print("Done.", len(model), " words loaded!")
     return model
-
-
-def vectorize_sentences(sentences):
-    vectorized = []
-    for sentence in sentences:
-        byword = sentence.split()
-        concat_vector = []
-        for word in byword:
-            try:
-                concat_vector.append(w2v[word])
-            except:
-                concat_vector.append(UNK_TOKEN)
-        concat_vector.append(END_TOKEN)
-        if padding_len - len(concat_vector) > 0:
-            for _ in range(padding_len - len(concat_vector)):
-                concat_vector.append(ZERO_TOKEN)
-        else:
-            concat_vector = concat_vector[:padding_len]
-        concat_vector = np.array(concat_vector)
-        vectorized.append(concat_vector)
-    return np.array(vectorized)
-
-
-def get_data(file_name):
-    with open(file_name, "r", encoding="utf8") as fp:
-        sentences = fp.read().split("\n")
-        return vectorize_sentences(sentences)
-
-
-# input: original dimension sentence vector
-# output: text
-def print_sentence_with_w2v(sent_vect):
-    for tocut in sent_vect[:10]:
-        word_sent = ''
-        for vec in tocut:
-            word_sent += w2v.most_similar(positive=[vec], topn=1)[0][0]
-            word_sent += " "
-        try:
-            print(word_sent)
-            print("=====================sent===============")
-        except Exception as e:
-            print("print exception")

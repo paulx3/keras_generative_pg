@@ -1,10 +1,11 @@
 import keras
 from keras import backend as K
 from keras import objectives
-from keras.layers import Input, RepeatVector, LSTM
+from keras.layers import Input, RepeatVector, LSTM, Embedding
 from keras.layers.core import Dense, Lambda
 from keras.models import Model
-from keras.optimizers import RMSprop
+from keras.optimizers import RMSprop, SGD
+from keras.backend import permute_dimensions, gather
 
 
 def create_lstm_vae(input_dim,
@@ -30,6 +31,15 @@ def create_lstm_vae(input_dim,
         - [Generating sentences from a continuous space](https://arxiv.org/abs/1511.06349)
     """
 
+    def crop_dimension():
+        def func(x):
+            x = K.permute_dimensions(x, (1, 0, 2))
+            x = K.gather(x, [i for i in range(30)])
+            x = K.permute_dimensions(x, (1, 0, 2))
+            return x
+
+        return Lambda(func)
+
     def crop(dimension, start, end):
         # Crops (or slices) a Tensor on a given dimension from start to end
         # example : to crop tensor x[:, :, 5:10]
@@ -48,14 +58,18 @@ def create_lstm_vae(input_dim,
 
         return Lambda(func)
 
+    crop_layer = crop_dimension()
     # drop_out_layer = Dropout(rate=0.0)
     # original sentence encoding
-    original_sentence_input = Input(shape=(timesteps, input_dim,), name="OriginalInput_1")
+    original_sentence_input = Input(shape=(None,), name="OriginalInput_1")
+    # original_sentence_input = Input(shape=(timesteps, input_dim,), name="OriginalInput_1")
+    embedding_layer = Embedding(30, input_dim + 1, mask_zero=True)
     original_encoder_layer_1 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_1")
     original_encoder_layer_2 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_2")
     original_encoder_layer_3 = LSTM(intermediate_dim, return_sequences=True, name="OriginalEncoderLSTM_3")
 
-    encoded_original = original_encoder_layer_1(original_sentence_input)
+    encoded_original = embedding_layer(original_sentence_input)
+    encoded_original = original_encoder_layer_1(encoded_original)
     # encoded_original = drop_out_layer(encoded_original)
     encoded_original = original_encoder_layer_2(encoded_original)
     # encoded_original = drop_out_layer(encoded_original)
@@ -66,11 +80,15 @@ def create_lstm_vae(input_dim,
     paraphrase_sentence_encoder_layer2 = LSTM(intermediate_dim, return_sequences=True, name="ParaphraseEncoderLSTM_2")
     paraphrase_sentence_encoder_layer3 = LSTM(intermediate_dim, return_sequences=True, name="ParaphraseEncoderLSTM_3")
 
-    x = Input(shape=(timesteps, input_dim,), name="ParaphraseInput_1")
+    # x = Input(shape=(timesteps, input_dim,), name="ParaphraseInput_1")
+    x = Input(shape=(None,), name="ParaphraseInput_1")
+    embedded_x = embedding_layer(x)
     # LSTM encoding
     # h = LSTM(intermediate_dim)(x)
     # merge original and paraphrase
-    h = keras.layers.concatenate([encoded_original, x], axis=-1)
+    encoded_original = crop_layer(encoded_original)
+    embedded_x = crop_layer(embedded_x)
+    h = keras.layers.concatenate([encoded_original, embedded_x], axis=-1)
     h = paraphrase_sentence_encoder_layer1(h)
     # h = drop_out_layer(h)
     h = paraphrase_sentence_encoder_layer2(h)
@@ -119,6 +137,8 @@ def create_lstm_vae(input_dim,
     h_decoded = RepeatVector(timesteps)(z)
 
     paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer1(encoded_original)
+
+    Lambda(lambda x: K.permute_dimensions(x, (1, 0, 2)))
     paraphrase_sentence_decoded = keras.layers.concatenate([h_decoded, paraphrase_sentence_decoded],
                                                            axis=-1)
     paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer2(paraphrase_sentence_decoded)
@@ -141,14 +161,17 @@ def create_lstm_vae(input_dim,
     decoder_latent_input = Input(shape=(latent_dim,), name="DecoderLatentInput_1")
     decoder_input_repeated = RepeatVector(timesteps)(decoder_latent_input)
     # decoder original encoder
-    decoder_original_input = Input(shape=(timesteps, input_dim,), name="DecoderOriginalInput_1")
-    decoder_original_encoded = original_encoder_layer_1(decoder_original_input)
+    # decoder_original_input = Input(shape=(timesteps, input_dim,), name="DecoderOriginalInput_1")
+    decoder_original_input = Input(shape=(None,), name="DecoderOriginalInput_1")
+    decoder_original_encoded = embedding_layer(decoder_original_input)
+    decoder_original_encoded = original_encoder_layer_1(decoder_original_encoded)
     # decoder_original_encoded = drop_out_layer(decoder_original_encoded)
     decoder_original_encoded = original_encoder_layer_2(decoder_original_encoded)
     # decoder_original_encoded = drop_out_layer(decoder_original_encoded)
     decoder_original_encoded = original_encoder_layer_3(decoder_original_encoded)
 
     paraphrase_sentence_decoded = paraphrase_sentence_decoder_layer1(decoder_original_encoded)
+    paraphrase_sentence_decoded = crop_layer(paraphrase_sentence_decoded)
     paraphrase_sentence_decoded = keras.layers.concatenate([decoder_input_repeated, paraphrase_sentence_decoded],
                                                            axis=-1)
     # paraphrase_sentence_decoded = drop_out_layer(paraphrase_sentence_decoded)
@@ -184,8 +207,8 @@ def create_lstm_vae(input_dim,
     #     return recon + kl
 
     # sgd = SGD(lr=0.00005, decay=1e-6, momentum=0.9, nesterov=True)
-    # sgd = SGD(lr=0.00005)
-    rmsprop = RMSprop()
-    vae.compile(optimizer=rmsprop, loss=vae_loss)
+    sgd = SGD(lr=0.00005)
+    # rmsprop = RMSprop()
+    vae.compile(optimizer=sgd, loss=vae_loss)
 
     return vae, encoder, generator
